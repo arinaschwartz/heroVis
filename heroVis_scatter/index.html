@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang = "en">
+	<head>
+		<meta charset="utf-8">
+		<title>D3 Test</title>
+		<script type="text/javascript" src="d3.v3.min.js"></script>
+		<style type="text/css">
+			.axis path,
+                  .axis line {
+                        fill: none;
+                        stroke: black;
+                        shape-rendering: crispEdges;
+                  }
+                  .axis text{
+                        font-family: sans-serif;
+                        font-size: 11px;
+                  }
+                  #tooltip{
+                        position: absolute;
+                        width: 150px;
+                        height: auto;
+                        padding: 10px;
+                        background-color: lightsteelblue;
+                        -webkit-border-radius: 10px;
+                        -moz-border-radius: 10px;
+                        border-radius: 10px;
+                        -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+                        -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+                        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+                        pointer-events: none;
+                  }
+
+                  #tooltip.hidden {
+                        display: none;
+                  }
+
+                  #tooltip p {
+                        margin: 0;
+                        font-family: sans-serif;
+                        font-size: 16px;
+                        line-height: 20px;
+                  }
+                  div {
+                        float: left;
+                        width: 200px;
+                  }
+		</style>
+	</head>
+	<body>
+            <h1>Dota 2 heroVis Scatterplot</h1>
+            <form id="controls">
+                  <div>
+                        <h2>X-Axis</h2>
+                        <ul>
+                              <li>
+                                    <select id="X-Attribute">
+                                          <option value="HP">HP</option>
+                                    </select>
+                              </li>
+                              
+                        </ul>
+ 
+                  </div>
+                  <div>
+                        <h2>Y-Axis</h2>
+                        <ul>
+                              <li>
+                                    <select id="Y-Attribute">
+                                          <option value="Armor">Armor</option>
+                                    </select>
+                              </li>
+                              
+                        </ul>
+ 
+                  </div>
+            </form>
+            <div id="tooltip" class="hidden">
+                  <p><span id="value">100</span></p>
+            </div>
+		<script type="text/javascript">
+		var w = 1200;
+            var h = 900;
+            var padding = 50;
+
+            d3.json('heroStats.json', function(heroStats){
+                  var xScale = d3.scale.linear()
+                              .domain([d3.min(heroStats, function(d){ return d.HP; }),
+                                       d3.max(heroStats, function(d){ return d.HP; })])
+                              .range([padding, w - padding * 2]);
+                  var yScale = d3.scale.linear()
+                              .domain([d3.min(heroStats, function(d){ return d.Armor; }),
+                                       d3.max(heroStats, function(d){ return d.Armor; })])
+                              .range([h - padding, padding]);
+                  var rScale = d3.scale.linear()
+                              .domain([d3.min(heroStats, function(d){ return d.Armor; }),
+                                       d3.max(heroStats, function(d){ return d.Armor; })])
+                              .range([2, 10]);
+                  var xAxis  = d3.svg.axis()
+                              .scale(xScale)
+                              .orient("bottom")
+
+                  var yAxis  = d3.svg.axis()
+                              .scale(yScale)
+                              .orient("left")
+
+                  var svg    = d3.select("body")
+            			.append("svg")
+            			.attr("width", w)
+            			.attr("height", h);
+                  var heroAttrs = d3.keys(heroStats[0])
+                  heroAttrs.splice(heroAttrs.indexOf("Name"), 1)
+                  heroAttrs.splice(heroAttrs.indexOf("HP"), 1)
+                  heroAttrs.splice(heroAttrs.indexOf("Armor"), 1)
+                  for(var i = 0; i < heroAttrs.length; i++){
+                        var x_menu = document.getElementById("X-Attribute");
+                        var y_menu = document.getElementById("Y-Attribute");
+                        var option_x = document.createElement("option");
+                        var option_y = document.createElement("option");
+                        option_x.text = heroAttrs[i]
+                        option_x.value = heroAttrs[i]
+                        option_y.text = heroAttrs[i]
+                        option_y.value = heroAttrs[i]
+                        x_menu.add(option_x)
+                        y_menu.add(option_y)
+                  }
+
+                  svg.append("g")
+                        .attr("id", "circles")
+                        /*.attr("clip-path", "url(#chart-area)")*/
+                        .selectAll("circle")
+                        .data(heroStats)
+                        .enter()
+                        .append("circle")
+                        .on("mouseover", function(d){
+                              var xPosition = parseFloat(d3.select(this).attr("cx"));
+                              var yPosition = parseFloat(d3.select(this).attr("cy"));
+                              d3.select("#tooltip")
+                                    .style("left", xPosition + "px")
+                                    .style("top", yPosition + "px")
+                                    .select("#value")
+                                    .text(d.Name + "\n" + getChosenXAttribute() + ": " +
+                                                                  d[getChosenXAttribute()] + "\n" + getChosenYAttribute() + ": " +
+                                                                        d[getChosenYAttribute()]);
+                              d3.select("#tooltip").classed("hidden", false)
+                              d3.select(this)
+                                    .transition()
+                                    .duration(50)
+                                    .attr("r", 9);
+                        })
+                        .on("mouseout", function(){
+                              d3.select("#tooltip").classed("hidden", true);
+                              d3.select(this)
+                                    .transition()
+                                    .duration(50)
+                                    .attr("r", 7);
+                        })
+                        .attr("cx", function(d){
+                                    return xScale(d.HP);
+                        })
+                        .attr("cy", function(d){
+                                    return yScale(d.Armor);
+                        })
+                        .attr("r", function(d){
+                                    return 7;
+                        })
+                        .attr("fill", function(d){
+                                    if(d.PrimaryStat == 0){
+                                          return "red";
+                                    }
+                                    else if(d.PrimaryStat == 1){
+                                          return "green";
+                                    }
+                                    else{
+                                          return "blue";
+                                    }
+                        });
+
+                  svg.append("g")
+                        .attr("class", "x axis")
+                        .attr("transform", "translate(0," + (h - padding) + ")")
+                        .call(xAxis);
+                  svg.append("g")
+                        .attr("class", "y axis")
+                        .attr("transform", "translate(" + padding + ", 0)")
+                        .call(yAxis);
+                  svg.append("clipPath")
+                        .attr("id", "chart-area")
+                        .append("rect")
+                        .attr("x", padding)
+                        .attr("y", padding)
+                        .attr("width", w - padding * 3)
+                        .attr("height", h - padding * 2);
+
+                  /*Update Functions*/
+                  function getChosenXAttribute(){
+                        var select = document.getElementById("X-Attribute")
+                        select.options[select.selectedIndex].value
+                        return select.options[select.selectedIndex].value;
+                  }
+                  function getChosenYAttribute(){
+                        var select = document.getElementById("Y-Attribute")
+                        select.options[select.selectedIndex].value
+                        return select.options[select.selectedIndex].value;
+                  }
+                  function update(){
+                        var x_attr = getChosenXAttribute()
+                        var y_attr = getChosenYAttribute()
+
+                        xScale.domain([d3.min(heroStats, function(d){ return d[x_attr]; }),
+                                          d3.max(heroStats, function(d){ return d[x_attr]; })]);
+                        yScale.domain([d3.min(heroStats, function(d){ return d[y_attr]; }),
+                                          d3.max(heroStats, function(d){ return d[y_attr]; })]);
+                        svg.selectAll("circle")
+                              .data(heroStats)
+                              .transition()
+                              .duration(1000)
+                              .attr("cx", function(d){
+                                          console
+                                          return xScale(d[x_attr]);
+                              })
+                              .attr("cy", function(d){
+                                          return yScale(d[y_attr]);
+                              })
+                        svg.select(".x.axis")
+                              .transition()
+                              .duration(1000)
+                              .call(xAxis);
+                        svg.select(".y.axis")
+                              .transition()
+                              .duration(1000)
+                              .call(yAxis);
+                  }
+                  /*Event Listeners*/
+                  document.getElementById("X-Attribute").addEventListener("change", update, false);
+                  document.getElementById("Y-Attribute").addEventListener("change", update, false);
+            });
+		</script>
+	</body>
+</html>

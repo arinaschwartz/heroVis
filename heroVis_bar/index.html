@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang = "en">
+	<head>
+		<meta charset="utf-8">
+		<title>D3 Test</title>
+		<script type="text/javascript" src="d3.v3.min.js"></script>
+		<style type="text/css">
+            rect:hover{
+                  fill: orange;
+            }
+            #tooltip{
+                  position: absolute;
+                  width: 200px;
+                  height: auto;
+                  padding: 10px;
+                  background-color: white;
+                  -webkit-border-radius: 10px;
+                  -moz-border-radius: 10px;
+                  border-radius: 10px;
+                  -webkit-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+                  -moz-box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+                  box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+                  pointer-events: none;
+            }
+
+            #tooltip.hidden {
+                  display: none;
+            }
+
+            #tooltip p {
+                  margin: 0;
+                  font-family: sans-serif;
+                  font-size: 16px;
+                  line-height: 20px;
+            }
+		</style>
+	</head>
+	<body>
+            <h1>Dota 2 heroVis Bar Chart</h1>
+            <form id="controls">
+                  <div>
+                        <h2>Attribute</h2>
+                        <ul>
+                              <li>
+                                    <select id="Attribute">
+                                          <option value="HP">HP</option>
+                                    </select>
+                              </li>
+                              
+                        </ul>
+ 
+                  </div>
+            </form>
+            <p>Click on the chart to sort in ascending/descending order</p>
+            <div id="tooltip" class="hidden">
+                  <p><strong></strong></p>
+                  <p><span id="value">100</span></p>
+            </div>
+		<script type="text/javascript">
+		var w = 1500;
+            var h = 500;
+            var padding = 20;
+            var maxValue = 100;
+		var dataset = [5, 10, 13, 19, 21, 25, 22, 18, 15, 13,
+                			11, 12, 15, 20, 18, 17, 16, 18, 23, 25];
+            /*Change later to display them from smallest to largest of a specific stat*/
+            d3.json("heroStats.json", function(heroStats){
+                  var xScale = d3.scale.ordinal()
+                                    .domain(d3.range(heroStats.length))
+                                    .rangeRoundBands([0, w], 0.05);
+                  var yScale = d3.scale.linear()
+                                    .domain([d3.min(heroStats, function(d){ return d.HP;}),
+                                                d3.max(heroStats, function(d){ return d.HP;})])
+                                    .range([padding, h])
+                  var colorScale = d3.scale.linear()
+                                    .domain([d3.min(heroStats, function(d){ return d.HP; }),
+                                                d3.max(heroStats, function(d){ return d.HP; })])
+                                    .range([50, 256]);
+                  var svg = d3.select("body")
+                  			.append("svg")
+                  			.attr("width", w)
+                  			.attr("height", h);
+                  var heroAttrs = d3.keys(heroStats[0])
+                  heroAttrs.splice(heroAttrs.indexOf("Name"), 1)
+                  heroAttrs.splice(heroAttrs.indexOf("HP"), 1)
+                  heroAttrs.splice(heroAttrs.indexOf("Patch"), 1)
+                  for(var i = 0; i < heroAttrs.length; i++){
+                        var menu = document.getElementById("Attribute");
+                        var option = document.createElement("option");
+                        option.text = heroAttrs[i]
+                        option.value = heroAttrs[i]
+                        menu.add(option)
+                  }
+                  svg.selectAll("rect")
+                  	.data(heroStats)
+                  	.enter()
+                  	.append("rect")
+                        /*.on("mouseover", function(){
+                              d3.select(this)
+                              .attr("fill", "orange")
+                        })
+                        .on("mouseout", function(d){
+                              d3.select(this)
+                              .transition()
+                              .duration(250)
+                              .attr("fill", "rgb(0, 0, " + (d * 10) + ")");
+                        })*/
+                        .on("mouseover", function(d){
+                              var xPosition = parseFloat(d3.select(this).attr("x")) + xScale.rangeBand() / 2;
+                              var yPosition = parseFloat(d3.select(this).attr("y")) / 2 + h / 2;
+                              d3.select("#tooltip")
+                                    .style("left", xPosition + "px")
+                                    .style("top", yPosition + "px")
+                                    .select("#value")
+                                    .text(d.Name + "\n" + getChosenAttribute()
+                                          + ": "  + d[getChosenAttribute()]);
+                              d3.select("#tooltip").classed("hidden", false);
+                        })
+                        .on("mouseout", function(){
+                              d3.select("#tooltip").classed("hidden", true);
+                        })
+                        .on("click", function(){
+                              sortBars();
+                        })
+                  	.attr("x", function(d, i){
+                  				return xScale(i);
+                  	})
+                  	.attr("y", function(d){
+                  				return h - yScale(d.HP);
+                  	})
+                  	.attr("width", xScale.rangeBand())
+                  	.attr("height", function(d){
+                  				return yScale(d.HP);
+                  	})
+                  	.attr("fill", function(d){
+                                          if (d.PrimaryStat == 0){
+                                                return "rgb(" + d3.round(colorScale(d.HP)) + ", 0, 0)";
+                                          }
+                                          else if (d.PrimaryStat == 1){
+                                                return "rgb(0, " + d3.round(colorScale(d.HP)) + ",0)";
+                                          }
+                  				else{
+                                                return "rgb(0, 0, " + d3.round(colorScale(d.HP)) + ")";
+                                          }
+                  	});
+
+                  /*Helper functions*/
+                  var sortOrder = false;
+                  var sortBars = function(){
+                        attr = getChosenAttribute()
+                        sortOrder = !sortOrder;
+                        svg.selectAll("rect")
+                              .sort(function(a, b){
+                                    if(sortOrder){
+                                          return d3.ascending(a[attr], b[attr]);
+                                    } else {
+                                          return d3.descending(a[attr], b[attr]);
+                                    }
+                              })
+                              .transition()
+                              .delay(function(d, i){
+                                    return i * 2;
+                              })
+                              .duration(500)
+                              .attr("x", function(d, i){
+                                    return xScale(i);
+                              });
+                  };
+                  function getChosenAttribute(){
+                        var select = document.getElementById("Attribute")
+                        select.options[select.selectedIndex].value
+                        return select.options[select.selectedIndex].value;
+                  }
+                  function update(){
+                        var attr = getChosenAttribute()
+                        yScale.domain([d3.min(heroStats, function(d){ return d[attr]; }),
+                                          d3.max(heroStats, function(d){ return d[attr]; })]);
+                        colorScale.domain([d3.min(heroStats, function(d){ return d[attr]; }),
+                                          d3.max(heroStats, function(d){ return d[attr]; })]);
+                        svg.selectAll("rect")
+                              .data(heroStats)
+                              .transition()
+                              .delay(function(d, i){
+                                    return i / dataset.length * 120;
+                              })
+                              .duration(500)
+                              .attr("y", function(d){
+                                    return h - yScale(d[attr]);
+                              })
+                              .attr("height", function(d){
+                                    return yScale(d[attr]);
+                              })
+                              .attr("fill", function(d){
+                                    if (d.PrimaryStat == 0){
+                                          return "rgb(" + d3.round(colorScale(d[attr])) + ", 0, 0)";
+                                    }
+                                    else if (d.PrimaryStat == 1){
+                                          return "rgb(0, " + d3.round(colorScale(d[attr])) + ",0)";
+                                    }
+                                    else {
+                                          return "rgb(0, 0, " + d3.round(colorScale(d[attr])) + ")";
+                                    }
+                              })
+
+                  }
+                  /*Event Listener*/
+                  document.getElementById("Attribute").addEventListener("change", update, false);
+            });
+		</script>
+	</body>
+</html>
